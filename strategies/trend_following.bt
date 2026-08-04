@@ -1,0 +1,12 @@
+strategy "Dual EMA & MACD Trend Follower"
+description "Momentum breakout strategy designed for high-volatility Crypto and Commodity Futures"
+author "B-Terminal Quant Research"
+timeframe 1h
+risk_max_position 0.20
+risk_max_loss 0.03
+
+entry_long: ema(close, 10) > ema(close, 50) && macd_hist(close, 12, 26, 9) > 0.0 && rsi(close, 14) > 50
+entry_short: ema(close, 10) < ema(close, 50) && macd_hist(close, 12, 26, 9) < 0.0 && rsi(close, 14) < 50
+
+exit_long: ema(close, 10) < ema(close, 50) || rsi(close, 14) < 40
+exit_short: ema(close, 10) > ema(close, 50) || rsi(close, 14) > 60

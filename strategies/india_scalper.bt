@@ -1,0 +1,19 @@
+strategy "India Active Scalper" {
+    universe: "NSE:RELIANCE"
+    timeframe: "5m"
+}
+indicators {
+    rsi: RSI(14)
+    sma: SMA(20)
+}
+entry {
+    long: rsi < 50 && close > sma
+    short: rsi > 50 && close < sma
+}
+exit {
+    stop_loss: 1%
+    take_profit: 2%
+}
+risk {
+    max_position: 20%
+}

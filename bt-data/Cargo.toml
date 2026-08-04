@@ -1,0 +1,33 @@
+[package]
+name = "bt-data"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+tungstenite = { workspace = true }
+tokio-tungstenite = { workspace = true }
+sqlx = { workspace = true }
+redis = { workspace = true }
+governor = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+dirs = { workspace = true }
+fastrand = { workspace = true }
+bytes = "1.5"
+futures = "0.3"
+parking_lot = "0.12"
+arrow = { workspace = true }
+parquet = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.10"

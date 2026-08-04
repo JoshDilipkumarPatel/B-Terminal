@@ -1,0 +1,85 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+string = ${ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+number = @{ ("+" | "-")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+integer = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
+
+strategy = { SOI ~ metadata? ~ indicator_block? ~ entry_block? ~ exit_block? ~ risk_block? ~ EOI }
+
+metadata = { "strategy" ~ string ~ "{" ~ metadata_field* ~ "}" }
+metadata_field = {
+    "universe" ~ ":" ~ string |
+    "timeframe" ~ ":" ~ string |
+    "session" ~ ":" ~ string |
+    "enabled" ~ ":" ~ boolean
+}
+
+indicator_block = { "indicators" ~ "{" ~ indicator_def+ ~ "}" }
+indicator_def = { identifier ~ ":" ~ indicator_call }
+
+indicator_call = {
+    "RSI" ~ "(" ~ number? ~ ")" |
+    "EMA" ~ "(" ~ number? ~ ")" |
+    "SMA" ~ "(" ~ number? ~ ")" |
+    "BOLLINGER" ~ "(" ~ number? ~ "," ~ number? ~ ")" |
+    "BB" ~ "(" ~ number? ~ "," ~ number? ~ ")" |
+    "MACD" ~ "(" ~ number? ~ "," ~ number? ~ "," ~ number? ~ ")" |
+    "ATR" ~ "(" ~ number? ~ ")" |
+    "VWAP" ~ "(" ~ ")" |
+    "VOLUME_SMA" ~ "(" ~ number? ~ ")" |
+    "STDDEV" ~ "(" ~ number? ~ ")" |
+    "HIGHEST" ~ "(" ~ number? ~ ")" |
+    "LOWEST" ~ "(" ~ number? ~ ")" |
+    "CROSS" ~ "(" ~ identifier ~ "," ~ identifier ~ ")" |
+    "CROSS_OVER" ~ "(" ~ identifier ~ "," ~ identifier ~ ")" |
+    "CROSS_UNDER" ~ "(" ~ identifier ~ "," ~ identifier ~ ")"
+}
+
+entry_block = { "entry" ~ "{" ~ entry_rule* ~ "}" }
+entry_rule = {
+    "long" ~ ":" ~ expression |
+    "short" ~ ":" ~ expression
+}
+
+exit_block = { "exit" ~ "{" ~ exit_rule* ~ "}" }
+exit_rule = {
+    "stop_loss" ~ ":" ~ number ~ "%"? |
+    "take_profit" ~ ":" ~ number ~ "%"? |
+    "trailing_stop" ~ ":" ~ number ~ "%"? |
+    "long_exit" ~ ":" ~ expression |
+    "short_exit" ~ ":" ~ expression |
+    "time_exit" ~ ":" ~ number ~ "min"?
+}
+
+risk_block = { "risk" ~ "{" ~ risk_rule* ~ "}" }
+risk_rule = {
+    "max_position" ~ ":" ~ number ~ "%"? |
+    "max_daily_loss" ~ ":" ~ number ~ "%"? |
+    "max_drawdown" ~ ":" ~ number ~ "%"? |
+    "max_correlation" ~ ":" ~ number |
+    "position_sizing" ~ ":" ~ string |
+    "max_leverage" ~ ":" ~ number
+}
+
+expression = { logical_expr }
+logical_expr = { comparison ~ (logical_op ~ comparison)* }
+logical_op = { "&&" | "||" | "AND" | "OR" }
+comparison = { term ~ (cmp_op ~ term)* }
+cmp_op = { ">=" | "<=" | "==" | "!=" | ">" | "<" }
+term = { factor ~ (add_op ~ factor)* }
+add_op = { "+" | "-" }
+factor = { unary ~ (mul_op ~ unary)* }
+mul_op = { "*" | "/" }
+unary = { ("!" | "-")? ~ primary }
+primary = {
+    number |
+    identifier |
+    "(" ~ expression ~ ")" |
+    function_call
+}
+
+function_call = { identifier ~ "(" ~ expression? ~ ("," ~ expression)* ~ ")" }
+
+boolean = { "true" | "false" }

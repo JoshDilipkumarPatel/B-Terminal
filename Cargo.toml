@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "bt-core",
+    "bt-data",
+    "bt-strategy",
+    "bt-execution",
+    "bt-tui",
+    "bt-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Ki Assistant Trading"]
+
+[workspace.dependencies]
+# Core
+tokio = { version = "1.40", features = ["full", "tracing"] }
+anyhow = "1.0"
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.35", features = ["serde"] }
+uuid = { version = "1.8", features = ["serde", "v4", "v7"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "chrono"] }
+tracing-appender = "0.6"
+clap = { version = "4.5", features = ["derive"] }
+async-trait = "0.1"
+dirs = "6.0"
+
+# Data
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "cookies"] }
+tungstenite = "0.22"
+tokio-tungstenite = { version = "0.22", features = ["rustls-tls-webpki-roots"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid", "rust_decimal"] }
+redis = { version = "0.23", features = ["tokio-comp", "connection-manager"] }
+governor = "0.6"  # rate limiting
+fastrand = "2.3"
+
+# TUI
+ratatui = "0.28"
+crossterm = "0.28"
+tui-textarea = "0.5"
+tui-input = "0.10"
+
+# Strategy/Math
+pest = "2.7"
+pest_derive = "2.7"
+ndarray = "0.16"
+statrs = "0.16"
+# ta-lib = "0.3"  # optional, requires system lib
+
+# Crypto Auth
+hmac = "0.12"
+sha2 = "0.10"
+
+# Columnar Storage
+arrow = { version = "54", default-features = false, features = ["prettyprint"] }
+parquet = { version = "54", default-features = false, features = ["arrow", "snap", "zstd"] }
+
+# Testing
+proptest = "1.4"
+mockall = "0.13"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+
+[profile.dev]
+overflow-checks = true

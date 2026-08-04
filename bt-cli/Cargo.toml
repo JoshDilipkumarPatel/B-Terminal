@@ -1,0 +1,26 @@
+[package]
+name = "bt-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "b-terminal"
+path = "src/main.rs"
+
+[dependencies]
+bt-core = { path = "../bt-core" }
+bt-data = { path = "../bt-data" }
+bt-strategy = { path = "../bt-strategy" }
+bt-execution = { path = "../bt-execution" }
+bt-tui = { path = "../bt-tui" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest.workspace = true

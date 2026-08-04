@@ -1,0 +1,12 @@
+strategy "Bollinger RSI Mean Reversion"
+description "Classic statistical mean reversion strategy targeting overbought/oversold extremes"
+author "B-Terminal Quant Research"
+timeframe 15m
+risk_max_position 0.10
+risk_max_loss 0.02
+
+entry_long: close < bb_lower(close, 20, 2.0) && rsi(close, 14) < 30
+entry_short: close > bb_upper(close, 20, 2.0) && rsi(close, 14) > 70
+
+exit_long: close >= bb_middle(close, 20) || rsi(close, 14) >= 55
+exit_short: close <= bb_middle(close, 20) || rsi(close, 14) <= 45

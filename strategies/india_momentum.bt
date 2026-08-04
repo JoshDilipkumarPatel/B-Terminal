@@ -1,0 +1,20 @@
+strategy "India Momentum & Mean Reversion" {
+    universe: "NSE:RELIANCE"
+    timeframe: "15m"
+}
+indicators {
+    rsi: RSI(14)
+    bb: BB(20, 2.0)
+    macd: MACD(12, 26, 9)
+}
+entry {
+    long: rsi < 35 && close < bb_lower && macd_hist > 0
+    short: rsi > 65 && close > bb_upper && macd_hist < 0
+}
+exit {
+    stop_loss: 1.5%
+    take_profit: 3.5%
+}
+risk {
+    max_position: 10%
+}

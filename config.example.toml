@@ -1,0 +1,71 @@
+# =========================================================================
+#                    B-TERMINAL CONFIGURATION TEMPLATE
+# =========================================================================
+# Copy this file to `config.toml` (or `config.local.toml`) and replace with
+# your personal broker API credentials and preferred workspace paths.
+# Note: `config.toml` and `.env` are excluded from Git for security.
+# =========================================================================
+
+[app]
+name = "bloomberg-terminal"
+version = "0.1.0"
+environment = "Development"
+data_dir = "./data"
+config_dir = "./config"
+
+[data]
+providers = [
+  # -----------------------------------------------------------------------
+  # INDIAN EQUITIES & OPTIONS (NSE / BSE / MUTUAL FUNDS via GROWW)
+  # -----------------------------------------------------------------------
+  { name = "groww", enabled = true, priority = 1, symbols = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "SBIN"], credentials = { api_key = "YOUR_GROWW_API_TOKEN_HERE", api_secret = "YOUR_GROWW_SECRET_HERE", base_url = "https://api.groww.in", ws_url = "wss://api.groww.in/stream" }, endpoints = { rest = "https://api.groww.in", websocket = "wss://api.groww.in/stream" }, reconnect = { max_attempts = 5, base_delay_ms = 1000, max_delay_ms = 10000, backoff_multiplier = 2.0, jitter = true } },
+
+  # -----------------------------------------------------------------------
+  # CRYPTOCURRENCIES & FUTURES (INR PAIRS via COINDCX)
+  # -----------------------------------------------------------------------
+  { name = "coindcx", enabled = true, priority = 2, symbols = ["BTCINR", "ETHINR", "SOLINR", "USDTINR"], credentials = { api_key = "YOUR_COINDCX_API_KEY_HERE", api_secret = "YOUR_COINDCX_SECRET_HERE", base_url = "https://api.coindcx.com", ws_url = "wss://stream.coindcx.com" }, endpoints = { rest = "https://api.coindcx.com", websocket = "wss://stream.coindcx.com" }, reconnect = { max_attempts = 5, base_delay_ms = 1000, max_delay_ms = 10000, backoff_multiplier = 2.0, jitter = true } },
+
+  # -----------------------------------------------------------------------
+  # US EQUITIES & GLOBAL MARKETS (OPTIONAL via ALPACA / BINANCE)
+  # -----------------------------------------------------------------------
+  # { name = "alpaca", enabled = false, priority = 3, symbols = ["AAPL", "MSFT", "GOOGL", "NVDA"], credentials = { api_key = "YOUR_ALPACA_KEY_HERE", api_secret = "YOUR_ALPACA_SECRET_HERE", base_url = "https://paper-api.alpaca.markets" }, endpoints = { rest = "https://paper-api.alpaca.markets", websocket = "wss://stream.data.alpaca.markets/v2/iex" } }
+]
+
+[data.cache]
+enabled = true
+memory_ttl_seconds = 300
+persistent = true
+db_path = "./data/cache.db"
+max_bars_per_symbol = 10000
+
+[data.historical]
+enabled = true
+default_limit = 1000
+max_limit = 50000
+
+[data.rate_limits]
+
+[strategy.dsl]
+strategies_dir = "./strategies"
+auto_reload = true
+validate_on_load = true
+
+[strategy.engine]
+enabled = true
+evaluation_interval_ms = 100
+max_concurrent_strategies = 10
+signal_dedup_window_ms = 1000
+min_signal_confidence = 0.55
+
+[strategy.backtest]
+enabled = true
+initial_capital = "1000000.00" # Default simulation equity: ₹10,00,000 / $1,000,000
+commission_per_share = "20.00" # E.g., standard brokerage flat rate per executed order
+commission_min = "20.00"
+slippage_bps = 5
+spread_bps = 2
+latency_ms = 50
+
+[strategy.risk]
+max_position_pct = "0.15"      # Cap individual asset allocation at 15% of total account capital
+max_daily_loss_pct = "0.02"    # 2% max drawdown triggering automatic kill switch
