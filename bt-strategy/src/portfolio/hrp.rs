@@ -118,8 +118,8 @@ impl HierarchicalRiskParity {
             let alpha = if v1 + v2 == 0.0 { 0.5 } else { 1.0 - v1 / (v1 + v2) };
             
             // Update weights
-            for i in start..=mid { w[i] *= alpha; }
-            for i in (mid + 1)..=end { w[i] *= 1.0 - alpha; }
+            for w_i in w.iter_mut().take(mid + 1).skip(start) { *w_i *= alpha; }
+            for w_i in w.iter_mut().take(end + 1).skip(mid + 1) { *w_i *= 1.0 - alpha; }
             
             // Recurse
             if start < mid { clusters.push((start, mid)); }
@@ -134,8 +134,8 @@ impl HierarchicalRiskParity {
         let mut inv_var = Vec::new();
         let mut sum_inv_var = 0.0;
         
-        for i in start..=end {
-            let asset_idx = sort_ix[i];
+        for sort_ix_i in sort_ix.iter().take(end + 1).skip(start) {
+            let asset_idx = *sort_ix_i;
             let v = cov[(asset_idx, asset_idx)];
             let iv = if v > 0.0 { 1.0 / v } else { 0.0 };
             inv_var.push(iv);
