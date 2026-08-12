@@ -25,7 +25,7 @@ impl BlackLitterman {
         q: &DVector<f64>,
         omega: &DMatrix<f64>,
     ) -> Result<DVector<f64>, String> {
-        let n = cov.nrows();
+        let _n = cov.nrows();
         
         // 1. Calculate Implied Equilibrium Returns (Pi)
         // Pi = lambda * Cov * w_mkt

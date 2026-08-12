@@ -195,6 +195,7 @@ impl SyndicateCouncil {
     /// Convenes the 18-Agent Ki Syndicate to evaluate a high-stakes trade proposal.
     /// Executes sub-millisecond Rust arbitration using dynamic regime meritocracy weights,
     /// integrating with local HuggingFace LLMs for dynamic text generation.
+    #[allow(clippy::too_many_arguments)]
     pub async fn convene(
         &self,
         symbol: &str,
@@ -688,7 +689,7 @@ impl SyndicateCouncil {
     /// Executes a trade using Reinforcement Learning bandits and dynamic participation scaling.
     pub fn execute_trade(
         &self,
-        symbol: &str,
+        _symbol: &str,
         trade_size_usd: f64,
         arrival_price: f64,
         current_price: f64,

@@ -65,7 +65,7 @@ impl ConformalPredictor {
         for (class, prob) in probs {
             let s_i = 1.0 - prob;
             if s_i <= q_hat {
-                prediction_set.push(class.clone());
+                prediction_set.push(*class);
             }
         }
         
@@ -73,11 +73,11 @@ impl ConformalPredictor {
         // we fallback to the highest probability class to prevent empty sets.
         if prediction_set.is_empty() && !probs.is_empty() {
             let mut max_prob = -1.0;
-            let mut best_class = probs[0].0.clone();
+            let mut best_class = probs[0].0;
             for (class, prob) in probs {
                 if *prob > max_prob {
                     max_prob = *prob;
-                    best_class = class.clone();
+                    best_class = *class;
                 }
             }
             prediction_set.push(best_class);

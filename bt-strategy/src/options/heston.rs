@@ -21,7 +21,7 @@ impl HestonModel {
         if theta < 0.0 { return Err("theta must be >= 0".to_string()); }
         if kappa <= 0.0 { return Err("kappa must be > 0".to_string()); }
         if xi < 0.0 { return Err("xi must be >= 0".to_string()); }
-        if rho < -1.0 || rho > 1.0 { return Err("rho must be between -1 and 1".to_string()); }
+        if !(-1.0..=1.0).contains(&rho) { return Err("rho must be between -1 and 1".to_string()); }
 
         // Feller condition: 2 * kappa * theta >= xi^2 ensures variance never hits exactly 0.
         // It's a nice-to-have but not strictly required for pricing var swaps, 

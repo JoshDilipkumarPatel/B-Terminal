@@ -2,8 +2,6 @@ use anyhow::Result;
 use candle_core::{Device, Tensor};
 use candle_transformers::models::quantized_llama::ModelWeights;
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::Write;
 use tokenizers::Tokenizer;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -47,7 +45,7 @@ impl CandleLlamaEngine {
         let model_path = cache_dir.join(model_filename);
 
         // Blocking downloader using our SChannel-backed reqwest instance
-        let mut download_file = |filename: &str, out_path: &PathBuf| -> Result<()> {
+        let download_file = |filename: &str, out_path: &PathBuf| -> Result<()> {
             if out_path.exists() {
                 return Ok(());
             }

@@ -1,6 +1,6 @@
-use clarabel::algebra::{CscMatrix, FloatT};
+use clarabel::algebra::CscMatrix;
 use clarabel::solver::{
-    DefaultSettings, DefaultSolver, SupportedConeT, IPSolver
+    DefaultSettings, DefaultSolver, IPSolver
 };
 use nalgebra::DVector;
 
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_convex_rebalance() {
-        let n = 3;
+        let _n = 3;
         // Target: 40%, 40%, 20%
         let target = DVector::from_vec(vec![0.4, 0.4, 0.2]);
         // Current: 50%, 30%, 20%

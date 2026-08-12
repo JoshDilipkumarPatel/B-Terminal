@@ -21,7 +21,7 @@ pub struct SviSurface {
 impl SviSurface {
     pub fn new(a: f64, b: f64, rho: f64, m: f64, sigma: f64) -> Result<Self, String> {
         if b < 0.0 { return Err("b must be >= 0".to_string()); }
-        if rho < -1.0 || rho > 1.0 { return Err("rho must be between -1 and 1".to_string()); }
+        if !(-1.0..=1.0).contains(&rho) { return Err("rho must be between -1 and 1".to_string()); }
         if sigma <= 0.0 { return Err("sigma must be > 0".to_string()); }
         
         // a + b*sigma*sqrt(1 - rho^2) must be >= 0 to ensure non-negative variance globally

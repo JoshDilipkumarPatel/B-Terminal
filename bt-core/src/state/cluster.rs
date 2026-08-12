@@ -1,7 +1,5 @@
-use std::sync::Arc;
-use tokio::sync::broadcast;
 use serde::{Serialize, Deserialize};
-use tracing::{info, error};
+use tracing::info;
 
 use super::crdt_position::PNCounter;
 
@@ -28,7 +26,7 @@ pub enum ClusterEvent {
 /// Manages Redis Pub/Sub communication for High-Availability
 pub struct ClusterManager {
     node_id: String,
-    redis_url: String,
+    _redis_url: String,
     
     // In a full implementation, we hold a redis::aio::Connection here.
     // For Pillar 4 verification, we expose the serialization pipeline.
@@ -38,7 +36,7 @@ impl ClusterManager {
     pub fn new(node_id: &str, redis_url: &str) -> Self {
         Self {
             node_id: node_id.to_string(),
-            redis_url: redis_url.to_string(),
+            _redis_url: redis_url.to_string(),
         }
     }
 

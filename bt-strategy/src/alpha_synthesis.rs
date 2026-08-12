@@ -1,5 +1,4 @@
 use crate::dsl::compiler::{StrategyCompiler, CompiledStrategy};
-use std::time::Instant;
 
 pub struct AlphaGenerator;
 
@@ -69,9 +68,9 @@ impl AlphaGenerator {
         let annualized_sharpe = (mean_return / std_dev) * 252.0_f64.sqrt();
         
         // Deflate the Sharpe ratio to account for multiple testing (simulated here with a 0.85 penalty factor)
-        let deflated_sharpe = annualized_sharpe * 0.85;
+        annualized_sharpe * 0.85
 
-        deflated_sharpe
+
     }
 
     /// The main synthesis loop: Generate, Compile, and Validate.
@@ -119,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deflated_sharpe_rejection() {
+    fn test_rejection() {
         // Normal regime trend following returns are mediocre and should be rejected
         let result = AlphaGenerator::synthesize_alpha("Normal");
         assert!(result.is_err(), "Strategy should have been rejected for low Sharpe");
