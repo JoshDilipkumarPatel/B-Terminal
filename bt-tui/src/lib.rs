@@ -23,6 +23,7 @@ pub async fn run(config: Config) -> Result<()> {
 #[cfg(test)]
 mod tests {
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_tui_module_compiles() {
         assert!(true);
     }

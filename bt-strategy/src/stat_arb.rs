@@ -91,7 +91,7 @@ impl PairsArbitrageEngine {
         let z_score = (current_spread - mean_spread) / std_dev_spread;
 
         // 5. Determine trade signal based on Z-Score thresholds
-        let signal = if z_score > 4.0 || z_score < -4.0 {
+        let signal = if !(-4.0..=4.0).contains(&z_score) {
             StatArbSignal::StopLossExit // Structural divergence anomaly
         } else if z_score > 2.0 {
             StatArbSignal::ShortA_LongB // Leg A overvalued relative to Leg B
@@ -105,6 +105,103 @@ impl PairsArbitrageEngine {
 
         // 6. Calculate cointegration confidence score (R² equivalent for spread predictability)
         let confidence = (cov_ab * cov_ab / (var_b * var_b * n as f64)).clamp(0.40, 0.99);
+
+        Some(StatArbResult {
+            symbol_a: symbol_a.to_string(),
+            symbol_b: symbol_b.to_string(),
+            price_a: current_price_a,
+            price_b: current_price_b,
+            hedge_ratio,
+            current_spread,
+            mean_spread,
+            std_dev_spread,
+            z_score,
+            signal,
+            confidence,
+        })
+    }
+
+    /// Performs Walk-Forward Out-of-Sample (OOS) Cointegration Validation:
+    /// Splits historical series into an In-Sample (IS) training window (default 80%) to derive the OLS hedge ratio & mean spread,
+    /// and tests whether spread stationarity holds across the remaining Out-of-Sample (OOS) testing window (20%).
+    /// Prevents structural overfitting and spurious parameter calibration in pairs trading.
+    pub fn analyze_walk_forward(
+        symbol_a: &str,
+        symbol_b: &str,
+        prices_a: &[f64],
+        prices_b: &[f64],
+    ) -> Option<StatArbResult> {
+        let n = prices_a.len().min(prices_b.len());
+        if n < 10 {
+            // Need sufficient sample observations for meaningful IS/OOS split
+            return Self::analyze(symbol_a, symbol_b, prices_a, prices_b);
+        }
+
+        // Split 80% In-Sample (IS) calibration, 20% Out-of-Sample (OOS) verification
+        let is_len = (n * 8) / 10;
+        let is_pa = &prices_a[..is_len];
+        let is_pb = &prices_b[..is_len];
+
+        // 1. Calculate OLS Hedge Ratio strictly from In-Sample window
+        let sum_b: f64 = is_pb.iter().sum();
+        let sum_a: f64 = is_pa.iter().sum();
+        let mean_b = sum_b / is_len as f64;
+        let mean_a = sum_a / is_len as f64;
+
+        let mut cov_ab = 0.0;
+        let mut var_b = 0.0;
+        for i in 0..is_len {
+            let db = is_pb[i] - mean_b;
+            let da = is_pa[i] - mean_a;
+            cov_ab += db * da;
+            var_b += db * db;
+        }
+        let hedge_ratio = if var_b > 1e-9 { cov_ab / var_b } else { 1.0 };
+
+        // 2. Compute spread mean and standard deviation strictly over In-Sample window
+        let mut is_spreads = Vec::with_capacity(is_len);
+        for i in 0..is_len {
+            is_spreads.push(is_pa[i] - (hedge_ratio * is_pb[i]));
+        }
+        let mean_spread = is_spreads.iter().sum::<f64>() / is_len as f64;
+        let mut var_spread = 0.0;
+        for s in &is_spreads {
+            let ds = *s - mean_spread;
+            var_spread += ds * ds;
+        }
+        let std_dev_spread = (var_spread / is_len as f64).sqrt().max(1e-6);
+
+        // 3. Out-of-Sample (OOS) Stationarity Validation over remaining 20% window
+        // Verify that OOS spread variance does not degrade significantly (> 3x IS variance)
+        let oos_len = n - is_len;
+        let mut oos_var_spread = 0.0;
+        for i in is_len..n {
+            let spread = prices_a[i] - (hedge_ratio * prices_b[i]);
+            let ds = spread - mean_spread;
+            oos_var_spread += ds * ds;
+        }
+        let oos_std_dev = (oos_var_spread / oos_len as f64).sqrt().max(1e-6);
+
+        // 4. Compute current Z-Score from latest OOS data tick
+        let current_price_a = prices_a[n - 1];
+        let current_price_b = prices_b[n - 1];
+        let current_spread = current_price_a - (hedge_ratio * current_price_b);
+        let z_score = (current_spread - mean_spread) / std_dev_spread;
+
+        // If OOS variance expanded by >3.5x over IS variance, structural regime break occurred: force StopLossExit / Neutral
+        let signal = if oos_std_dev > std_dev_spread * 3.5 || !(-4.0..=4.0).contains(&z_score) {
+            StatArbSignal::StopLossExit
+        } else if z_score > 2.0 {
+            StatArbSignal::ShortA_LongB
+        } else if z_score < -2.0 {
+            StatArbSignal::LongA_ShortB
+        } else if z_score.abs() <= 0.5 {
+            StatArbSignal::MeanRevertedExit
+        } else {
+            StatArbSignal::Neutral
+        };
+
+        let confidence = (cov_ab * cov_ab / (var_b * var_b * is_len as f64)).clamp(0.40, 0.99);
 
         Some(StatArbResult {
             symbol_a: symbol_a.to_string(),
@@ -146,5 +243,14 @@ mod tests {
         let res_conv = PairsArbitrageEngine::analyze("NSE:HDFCBANK", "NSE:ICICIBANK", &prices_a, &prices_b).unwrap();
         assert!(res_conv.z_score.abs() <= 0.5);
         assert_eq!(res_conv.signal, StatArbSignal::MeanRevertedExit);
+    }
+
+    #[test]
+    fn test_walk_forward_oos_validation() {
+        let prices_a = vec![100.0, 101.0, 102.0, 101.5, 100.5, 101.2, 100.8, 101.0, 101.1, 108.0];
+        let prices_b = vec![10.0, 10.1, 10.2, 10.15, 10.05, 10.12, 10.08, 10.10, 10.11, 10.10];
+        let oos_res = PairsArbitrageEngine::analyze_walk_forward("NSE:HDFCBANK", "NSE:ICICIBANK", &prices_a, &prices_b).unwrap();
+        assert_eq!(oos_res.symbol_a, "NSE:HDFCBANK");
+        assert!(oos_res.z_score > 0.0);
     }
 }

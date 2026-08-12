@@ -41,31 +41,41 @@ impl Theme {
     pub fn from_name(name: &str) -> Self {
         match name.to_lowercase().as_str() {
             "bloomberg" => {
-                let mut config = ColorConfig::default();
-                config.bg = "#000000".to_string();
-                config.fg = "#FFB400".to_string();
+                let config = ColorConfig {
+                    bg: "#000000".to_string(),
+                    fg: "#FFB400".to_string(),
+                    ..ColorConfig::default()
+                };
                 Self::new(config)
             }
             "dark" => {
-                let mut config = ColorConfig::default();
-                config.bg = "#121212".to_string();
-                config.fg = "#FFFFFF".to_string();
+                let config = ColorConfig {
+                    bg: "#121212".to_string(),
+                    fg: "#FFFFFF".to_string(),
+                    ..ColorConfig::default()
+                };
                 Self::new(config)
             }
             "light" => {
-                let mut config = ColorConfig::default();
-                config.bg = "#FFFFFF".to_string();
-                config.fg = "#000000".to_string();
+                let config = ColorConfig {
+                    bg: "#FFFFFF".to_string(),
+                    fg: "#000000".to_string(),
+                    ..ColorConfig::default()
+                };
                 Self::new(config)
             }
             _ => Self::default(),
         }
     }
+}
 
-    pub fn default() -> Self {
+impl Default for Theme {
+    fn default() -> Self {
         Self::new(ColorConfig::default())
     }
+}
 
+impl Theme {
     pub fn base_style(&self) -> Style {
         Style::default().fg(self.fg).bg(self.bg)
     }

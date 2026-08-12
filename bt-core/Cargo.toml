@@ -16,3 +16,20 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 dirs = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+sha2.workspace = true
+zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
+wgpu = "0.19.3"
+bytemuck = { version = "1.25.2", features = ["derive"] }
+rand = "0.8.5"
+futures-channel = "0.3.33"
+naga = "0.19.2"
+redis.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[[bench]]
+name = "risk_benchmark"
+harness = false

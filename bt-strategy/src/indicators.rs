@@ -460,6 +460,12 @@ pub struct VWAP {
     last_date: Option<chrono::NaiveDate>,
 }
 
+impl Default for VWAP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VWAP {
     pub fn new() -> Self {
         Self {
@@ -631,6 +637,12 @@ pub struct CrossOver {
     prev_b: Option<Decimal>,
 }
 
+impl Default for CrossOver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrossOver {
     pub fn new() -> Self { Self { prev_a: None, prev_b: None } }
 }
@@ -655,43 +667,43 @@ impl Indicator for CrossOver {
 pub fn create_indicator(kind: IndicatorKind, params: &[f64]) -> Box<dyn Indicator> {
     match kind {
         IndicatorKind::RSI => {
-            let period = params.get(0).copied().unwrap_or(14.0) as usize;
+            let period = params.first().copied().unwrap_or(14.0) as usize;
             Box::new(RSI::new(period))
         }
         IndicatorKind::SMA => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             Box::new(SMA::new(period))
         }
         IndicatorKind::EMA => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             Box::new(EMA::new(period))
         }
         IndicatorKind::BollingerBands => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             let std_dev = Decimal::from_f64_retain(params.get(1).copied().unwrap_or(2.0)).unwrap_or(Decimal::new(2, 0));
             Box::new(BollingerBands::new(period, std_dev))
         }
         IndicatorKind::MACD => {
-            let fast = params.get(0).copied().unwrap_or(12.0) as usize;
+            let fast = params.first().copied().unwrap_or(12.0) as usize;
             let slow = params.get(1).copied().unwrap_or(26.0) as usize;
             let signal = params.get(2).copied().unwrap_or(9.0) as usize;
             Box::new(MACD::new(fast, slow, signal))
         }
         IndicatorKind::ATR => {
-            let period = params.get(0).copied().unwrap_or(14.0) as usize;
+            let period = params.first().copied().unwrap_or(14.0) as usize;
             Box::new(ATR::new(period))
         }
         IndicatorKind::VWAP => Box::new(VWAP::new()),
         IndicatorKind::StdDev => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             Box::new(StdDev::new(period))
         }
         IndicatorKind::Highest => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             Box::new(Highest::new(period))
         }
         IndicatorKind::Lowest => {
-            let period = params.get(0).copied().unwrap_or(20.0) as usize;
+            let period = params.first().copied().unwrap_or(20.0) as usize;
             Box::new(Lowest::new(period))
         }
         _ => Box::new(DummyIndicator),

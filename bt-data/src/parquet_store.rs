@@ -146,9 +146,9 @@ impl ParquetStore {
             if file_path.exists() {
                 let file = fs::File::open(&file_path)?;
                 let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
-                let mut reader = builder.build()?;
+                let reader = builder.build()?;
 
-                while let Some(maybe_batch) = reader.next() {
+                for maybe_batch in reader {
                     let batch = maybe_batch?;
                     
                     let timestamps = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
@@ -176,7 +176,7 @@ impl ParquetStore {
                                 vwap: if vwaps.is_null(i) { None } else { Decimal::from_f64(vwaps.value(i)) },
                                 trade_count: if trade_counts.is_null(i) { None } else { Some(trade_counts.value(i) as u64) },
                                 timestamp: ts,
-                                venue: venue.clone(),
+                                venue,
                             };
                             bars.push(bar);
                         }

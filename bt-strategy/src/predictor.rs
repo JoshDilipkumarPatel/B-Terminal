@@ -186,12 +186,13 @@ impl TrendPredictor {
             confidence = (confidence + 0.45).min(0.92);
         }
 
-        let mut ensemble_factors = Vec::new();
-        ensemble_factors.push(("r2_score".to_string(), r2_score));
-        ensemble_factors.push(("trend_strength".to_string(), trend_strength));
-        ensemble_factors.push(("vol_penalty".to_string(), -vol_penalty));
-        ensemble_factors.push(("garch_volatility".to_string(), garch_volatility));
-        ensemble_factors.push(("volume_momentum".to_string(), volume_momentum));
+        let ensemble_factors = vec![
+            ("r2_score".to_string(), r2_score),
+            ("trend_strength".to_string(), trend_strength),
+            ("vol_penalty".to_string(), -vol_penalty),
+            ("garch_volatility".to_string(), garch_volatility),
+            ("volume_momentum".to_string(), volume_momentum),
+        ];
 
         // Recommend side based on regime and confidence threshold
         let recommended_side = match regime {

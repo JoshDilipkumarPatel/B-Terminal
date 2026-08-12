@@ -138,6 +138,7 @@ impl BinanceProvider {
         symbol.ticker.to_lowercase()
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn from_binance_symbol(&self, sym: &str) -> Symbol {
         Symbol::crypto(Venue::Binance, sym.to_uppercase())
     }

@@ -134,7 +134,7 @@ impl BacktestEngine {
         // Load historical data
         let timeframe = self.parse_timeframe(compiled.timeframe().unwrap_or("5m"));
         let start = self.config.start_date.unwrap_or_else(|| Utc::now() - Duration::days(365));
-        let end = self.config.end_date.unwrap_or_else(|| Utc::now());
+        let end = self.config.end_date.unwrap_or_else(Utc::now);
 
         // We need a symbol to test - in practice this comes from strategy metadata
         let symbol = self.get_test_symbol(&compiled)?;
@@ -325,7 +325,9 @@ impl BacktestSimulator {
 
         // Close any open position at end
         if let Some(pos) = self.position.take() {
-            let last_bar = self.bars.last().unwrap().clone();
+            let Some(last_bar) = self.bars.last().cloned() else {
+                return Ok(());
+            };
             self.close_position(&last_bar, ExitReason::TimeExit, pos);
         }
 
@@ -504,8 +506,8 @@ impl BacktestSimulator {
     fn calculate_position_size(&self, price: Decimal) -> Decimal {
         let max_pct = self.compiled.risk_max_position_pct().unwrap_or(10.0);
         let max_position_value = self.equity * Decimal::from_f64_retain(max_pct / 100.0).unwrap_or(Decimal::ZERO);
-        let quantity = (max_position_value / price).floor();
-        quantity
+        
+        (max_position_value / price).floor()
     }
 
     fn unrealized_pnl(&self, bar: &Bar) -> Decimal {
@@ -586,6 +588,7 @@ impl BacktestSimulator {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn eval_numeric(&self, expr: &crate::dsl::ast::Expression, values: &HashMap<String, IndicatorOutput>, previous_values: &HashMap<String, IndicatorOutput>) -> Option<Decimal> {
         match expr {
             crate::dsl::ast::Expression::Literal(v) => Some(Decimal::from_f64_retain(*v).unwrap_or(Decimal::ZERO)),

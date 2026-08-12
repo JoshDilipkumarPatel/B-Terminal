@@ -2,6 +2,8 @@
 
 pub mod cache;
 pub mod crypto;
+pub mod fpga_lob;
+pub mod zero_alloc_queue;
 pub mod manager;
 pub mod mock;
 pub mod normalization;
@@ -12,6 +14,8 @@ pub mod parquet_store;
 pub mod nse_connector;
 pub mod turbo_quant;
 pub mod doc_parser;
+pub mod vpin;
+pub mod microstructure;
 
 pub use cache::{BarCache, DataCacheConfig, QuoteCache};
 pub use crypto::{BinanceProvider, BinanceConfig, CoinbaseProvider, CoinbaseConfig};

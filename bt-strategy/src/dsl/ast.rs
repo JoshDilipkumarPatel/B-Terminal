@@ -177,6 +177,7 @@ impl Expression {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn not(expr: Expression) -> Self {
         Expression::UnaryOp {
             op: UnaryOperator::Not,

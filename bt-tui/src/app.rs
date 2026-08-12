@@ -156,7 +156,9 @@ impl App {
         let ki_assistant = KiAssistantWidget::new(theme.clone());
 
         // Initialize core systems
-        let risk_manager = RiskManager::new(bt_core::risk_limits::RiskLimits::default());
+        let mut risk_limits = bt_core::risk_limits::RiskLimits::default();
+        risk_limits.global.correlation_recompute_interval = config.risk.global.correlation_recompute_interval;
+        let risk_manager = RiskManager::new(risk_limits);
         let kill_switch = Arc::new(GlobalKillSwitch::new(tokio::sync::broadcast::channel(100).0, 1000));
         let data_manager = DataFeedManager::new();
         let signal_engine = SignalEngine::new(bt_strategy::EngineConfig::default(), tokio::sync::broadcast::channel(100).0);
@@ -635,7 +637,7 @@ impl App {
                 }
             }
             SystemEvent::ConnectionStatus(status) => {
-                self.market_overview.update_connection_status(status.clone());
+                self.market_overview.update_connection_status(status);
                 self.set_status(&format!("Connection: {:?}", status), false);
             }
             SystemEvent::LogEvent(log) => {
@@ -764,7 +766,7 @@ impl App {
     }
 
     fn render(&mut self) -> Result<()> {
-        let is_market_focused = self.focused_pane == PaneType::MarketOverview.into();
+        let is_market_focused = self.focused_pane == PaneType::MarketOverview;
         self.market_overview.set_focus(is_market_focused);
         let kill_active = self.kill_switch.is_active();
 
@@ -912,15 +914,13 @@ Bloomberg-style shortcuts:
     }
 
     fn focus_next_pane(&mut self) {
-        let panes = vec![
-            FocusablePane::MarketOverview,
+        let panes = [FocusablePane::MarketOverview,
             FocusablePane::SecurityDetail,
             FocusablePane::Chart,
             FocusablePane::OrderBook,
             FocusablePane::News,
             FocusablePane::Portfolio,
-            FocusablePane::KiAssistant,
-        ];
+            FocusablePane::KiAssistant];
 
         if let Some(idx) = panes.iter().position(|p| *p == self.focused_pane) {
             let next = panes[(idx + 1) % panes.len()];
@@ -930,15 +930,13 @@ Bloomberg-style shortcuts:
     }
 
     fn focus_prev_pane(&mut self) {
-        let panes = vec![
-            FocusablePane::MarketOverview,
+        let panes = [FocusablePane::MarketOverview,
             FocusablePane::SecurityDetail,
             FocusablePane::Chart,
             FocusablePane::OrderBook,
             FocusablePane::News,
             FocusablePane::Portfolio,
-            FocusablePane::KiAssistant,
-        ];
+            FocusablePane::KiAssistant];
 
         if let Some(idx) = panes.iter().position(|p| *p == self.focused_pane) {
             let prev = if idx == 0 { panes.len() - 1 } else { idx - 1 };

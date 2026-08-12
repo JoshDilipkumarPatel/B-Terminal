@@ -1,6 +1,9 @@
 use serde::{Serialize, Deserialize};
 use statrs::distribution::{Normal, Continuous, ContinuousCDF};
 
+pub mod svi_surface;
+pub mod heston;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum OptionKind { Call, Put }
 
@@ -185,6 +188,40 @@ impl BlackScholes {
         
         let time = days_to_expiry / 365.0;
         Self::generate_chain("NIFTY".to_string(), spot, rate, vol, time, format!("{}D", days_to_expiry), &strikes)
+    }
+}
+
+/// rough Bergomi (rBergomi) Stochastic Volatility Model
+/// 
+/// The rBergomi model replaces the constant volatility assumption of Black-Scholes 
+/// with a rough stochastic volatility process driven by fractional Brownian motion.
+/// This captures the "roughness" and persistence of volatility clustering in real markets.
+pub struct RBergomi;
+
+impl RBergomi {
+    /// Approximates the rBergomi option price.
+    /// In a full implementation, this requires heavy Monte Carlo simulations with 
+    /// Cholesky decomposition of the fractional Brownian motion covariance matrix.
+    /// For this blueprint stub, we apply a deterministic roughness skew to the 
+    /// Black-Scholes implied volatility based on the Hurst exponent (H).
+    #[allow(clippy::too_many_arguments)]
+    pub fn price_approx(
+        kind: OptionKind,
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        forward_variance: f64, // xi
+        hurst_exponent: f64,   // H (typically ~0.1 in equity markets)
+        vol_of_vol: f64,       // eta
+        time: f64,
+    ) -> f64 {
+        // Simple deterministic proxy: we adjust the forward variance using the Hurst exponent
+        // to create a short-term volatility skew.
+        let rough_vol_proxy = (forward_variance * (1.0 + vol_of_vol * time.powf(hurst_exponent - 0.5))).sqrt();
+        
+        // Pass the rough volatility proxy into the standard Black-Scholes engine
+        // as a closed-form approximation of the expected rBergomi price.
+        BlackScholes::price(kind, spot, strike, rate, rough_vol_proxy, time)
     }
 }
 

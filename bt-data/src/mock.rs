@@ -27,6 +27,12 @@ pub struct MockProvider {
     connected: bool,
 }
 
+impl Default for MockProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockProvider {
     pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(1000);
@@ -300,7 +306,7 @@ impl HistoricalDataProvider for MockProvider {
 
     async fn search_symbols(&self, query: &str) -> Result<Vec<Symbol>> {
         let mut results = Vec::new();
-        for (symbol, _) in &self.base_prices {
+        for symbol in self.base_prices.keys() {
             if symbol.ticker.to_lowercase().contains(&query.to_lowercase()) {
                 results.push(symbol.clone());
             }
@@ -320,6 +326,7 @@ impl NewsProvider for MockProvider {
             "Crypto regulation bill advances in Senate",
             "Yield curve steepens on growth data",
         ];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..limit.min(headlines.len()) {
             news.push(bt_core::events::NewsItem {
                 id: Uuid::new_v4().to_string(),

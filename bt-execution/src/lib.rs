@@ -10,6 +10,7 @@ pub mod coindcx;
 pub mod zerodha;
 pub mod upstox;
 pub mod angel_one;
+pub mod idempotency_store;
 
 pub use broker::{BrokerAdapter, BrokerConfig, BrokerType, BrokerCredentials, BrokerEndpoints, BrokerHealth, BrokerAccountInfo, AccountType, AccountStatus, RateLimitConfig};
 pub use alpaca::AlpacaAdapter;

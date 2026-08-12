@@ -28,6 +28,17 @@ futures = "0.3"
 parking_lot = "0.12"
 arrow = { workspace = true }
 parquet = { workspace = true }
+crossbeam = { version = "0.8.4", features = ["crossbeam-queue"] }
 
 [dev-dependencies]
 tempfile = "3.10"
+criterion = { version = "0.5", features = ["async_tokio"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[[bench]]
+name = "orderbook_benchmark"
+harness = false
+
+[[bench]]
+name = "vpin_benchmark"
+harness = false

@@ -29,7 +29,11 @@ impl UpstoxAdapter {
         let (event_tx, _) = broadcast::channel(100);
         Self {
             config,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .build()
+                .expect("Failed to build HTTP client"),
             event_tx,
             connected: std::sync::atomic::AtomicBool::new(false),
         }
@@ -47,10 +51,11 @@ impl BrokerAdapter for UpstoxAdapter {
     }
 
     fn is_paper(&self) -> bool {
-        false
+        true
     }
 
     async fn connect(&mut self) -> anyhow::Result<()> {
+        crate::broker::enforce_stub_broker_safety(self.name())?;
         self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
@@ -61,16 +66,19 @@ impl BrokerAdapter for UpstoxAdapter {
     }
 
     async fn place_order(&self, order: Order) -> anyhow::Result<OrderId> {
+        crate::broker::enforce_stub_broker_safety(self.name())?;
         // TODO: Implement Upstox order placement
         Ok(order.id)
     }
 
     async fn cancel_order(&self, _order_id: OrderId) -> anyhow::Result<()> {
+        crate::broker::enforce_stub_broker_safety(self.name())?;
         // TODO: Implement Upstox order cancellation
         Ok(())
     }
 
     async fn cancel_all_orders(&self) -> anyhow::Result<()> {
+        crate::broker::enforce_stub_broker_safety(self.name())?;
         Ok(())
     }
 
@@ -126,5 +134,28 @@ impl BrokerAdapter for UpstoxAdapter {
             error_rate: 0.0,
             connection_status: "connected".to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_upstox_stub_safety_and_paper_introspection() {
+        let mut adapter = UpstoxAdapter::new(UpstoxConfig {
+            api_key: "key".to_string(),
+            access_token: "token".to_string(),
+            base_url: "http://localhost".to_string(),
+        });
+        assert!(adapter.is_paper(), "Stub adapters must return true for is_paper()");
+        assert!(adapter.get_account().await.is_ok(), "Read-only introspection must succeed");
+        assert!(adapter.get_positions().await.is_ok(), "Read-only introspection must succeed");
+        assert!(adapter.health_check().await.is_ok(), "Health check must succeed");
+
+        if !cfg!(feature = "stub-brokers") {
+            assert!(adapter.connect().await.is_err(), "Must reject live connect attempt without explicit feature flag");
+            assert!(adapter.cancel_all_orders().await.is_err(), "Must reject order modification attempts");
+        }
     }
 }

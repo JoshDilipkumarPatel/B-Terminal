@@ -26,18 +26,15 @@ pub struct AppConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Environment {
+    #[default]
     Development,
     Staging,
     Production,
     Test,
 }
 
-impl Default for Environment {
-    fn default() -> Self {
-        Environment::Development
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataConfig {
@@ -162,12 +159,38 @@ pub struct StrategyRiskConfig {
     pub max_correlation: f64,
 }
 
+fn default_idempotency_persistence_enabled() -> bool {
+    true
+}
+
+/// Persistent idempotency-key store configuration.
+/// Survives process restarts so a 300s deduplication window is not lost on restart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdempotencyConfig {
+    #[serde(default = "default_idempotency_persistence_enabled")]
+    pub persistence_enabled: bool,
+    /// SQLite database path. `None` derives a default from `app.data_dir`.
+    #[serde(default)]
+    pub db_path: Option<PathBuf>,
+}
+
+impl Default for IdempotencyConfig {
+    fn default() -> Self {
+        Self {
+            persistence_enabled: true,
+            db_path: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionConfig {
     pub brokers: Vec<BrokerConfig>,
     pub default_broker: String,
     pub order_routing: RoutingConfig,
     pub simulator: SimulatorConfig,
+    #[serde(default)]
+    pub idempotency: IdempotencyConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,6 +269,14 @@ pub struct RiskConfig {
     pub kill_switch: KillSwitchConfig,
 }
 
+fn default_max_sector_exposure_pct() -> Decimal {
+    Decimal::new(5, 2)
+}
+
+fn default_correlation_recompute_interval() -> usize {
+    100
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalRiskLimits {
     pub max_daily_loss_pct: Decimal,
@@ -254,6 +285,11 @@ pub struct GlobalRiskLimits {
     pub max_open_orders: usize,
     pub max_order_size_usd: Decimal,
     pub max_portfolio_heat: Decimal,
+    #[serde(default = "default_max_sector_exposure_pct")]
+    pub max_sector_exposure_pct: Decimal,
+    /// Recompute dynamic correlation groups every N daily-return updates.
+    #[serde(default = "default_correlation_recompute_interval")]
+    pub correlation_recompute_interval: usize,
     pub kill_on_breach: bool,
 }
 
@@ -329,12 +365,28 @@ pub enum RotationPolicy {
     Size,
 }
 
+fn default_encryption_key_env_var() -> String {
+    "B_TERMINAL_AUDIT_KEY".to_string()
+}
+
+fn default_key_rotation_days() -> u32 {
+    30
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLogConfig {
     pub enabled: bool,
     pub path: PathBuf,
     pub hash_chain: bool,
     pub encrypt: bool,
+    #[serde(default = "default_encryption_key_env_var")]
+    pub encryption_key_env_var: String,
+    #[serde(default = "default_key_rotation_days")]
+    pub key_rotation_days: u32,
+    #[serde(default)]
+    pub anchor_checkpoint_url: Option<String>, // External SIEM/WORM root anchor for tamper-evident verification
+    #[serde(default)]
+    pub key_escrow_path: Option<PathBuf>, // Secure archival vault path for decipherability of historical rotated keys
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -535,10 +587,10 @@ impl Default for Config {
                     latency_ms: 50,
                 },
                 risk: StrategyRiskConfig {
-                    max_position_pct: Decimal::new(5, 2),
+                    max_position_pct: Decimal::new(1, 2), // 1% ($1,000 on $100K capital, matching global max_order_size_usd)
                     max_daily_loss_pct: Decimal::new(2, 2),
                     max_drawdown_pct: Decimal::new(10, 2),
-                    max_leverage: Decimal::new(2, 1),
+                    max_leverage: Decimal::ONE, // 1.0x (no leverage, matching global max_leverage)
                     max_correlation: 0.7,
                 },
             },
@@ -560,15 +612,21 @@ impl Default for Config {
                     partial_fill_probability: 0.1,
                     latency_ms: 10,
                 },
+                idempotency: IdempotencyConfig {
+                    persistence_enabled: true,
+                    db_path: Some(data_dir.join("idempotency.sqlite")),
+                },
             },
             risk: RiskConfig {
                 global: GlobalRiskLimits {
                     max_daily_loss_pct: Decimal::new(3, 2),
                     max_drawdown_pct: Decimal::new(10, 2),
-                    max_leverage: Decimal::new(2, 1),
+                    max_leverage: Decimal::ONE, // Conservatively limited to 1.0x (no leverage) by default
                     max_open_orders: 100,
-                    max_order_size_usd: Decimal::new(50000, 2),
-                    max_portfolio_heat: Decimal::new(80, 2),
+                    max_order_size_usd: Decimal::new(1000, 0), // Conservatively limited to $1,000 per order
+                    max_portfolio_heat: Decimal::new(20, 2), // Conservatively capped at 20% portfolio exposure
+                    max_sector_exposure_pct: Decimal::new(5, 2), // Capped at 5% aggregate correlated sector exposure
+                    correlation_recompute_interval: 100, // Re-cluster dynamic correlation groups every 100 daily-return updates
                     kill_on_breach: true,
                 },
                 per_strategy: HashMap::new(),
@@ -595,7 +653,11 @@ impl Default for Config {
                     enabled: true,
                     path: data_dir.join("audit").join("bt_audit.log"),
                     hash_chain: true,
-                    encrypt: false,
+                    encrypt: true, // Audit logs encrypted by default per security mandate
+                    encryption_key_env_var: "BT_AUDIT_ENCRYPTION_KEY".into(),
+                    key_rotation_days: 30,
+                    anchor_checkpoint_url: Some("https://siem.enterprise.internal/checkpoint/wom_root".to_string()),
+                    key_escrow_path: Some(data_dir.join("audit").join("key_escrow_vault")),
                 },
             },
             tui: TuiConfig {
@@ -731,5 +793,27 @@ impl Config {
         let toml_str = toml::to_string_pretty(self)?;
         std::fs::write(config_path, toml_str)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_conservative_security_defaults() {
+        let config = Config::default();
+        assert_eq!(config.risk.global.max_order_size_usd, Decimal::new(1000, 0), "Default max order size must be conservatively limited to $1,000");
+        assert_eq!(config.risk.global.max_leverage, Decimal::ONE, "Default leverage must be capped at 1.0x");
+        assert_eq!(config.risk.global.max_portfolio_heat, Decimal::new(20, 2), "Default portfolio heat must be capped at 20%");
+        assert_eq!(config.risk.global.max_sector_exposure_pct, Decimal::new(5, 2), "Default aggregate sector exposure must be capped at 5%");
+        assert_eq!(config.risk.global.correlation_recompute_interval, 100, "Dynamic correlation recompute interval must default to 100");
+        assert_eq!(config.strategy.risk.max_leverage, Decimal::ONE, "Strategy max leverage must default to 1.0x to match global limits");
+        assert_eq!(config.strategy.risk.max_position_pct, Decimal::new(1, 2), "Strategy max position must default to 1% ($1,000)");
+        assert!(config.logging.audit.encrypt, "Audit log encryption must be enabled by default");
+        assert_eq!(config.logging.audit.encryption_key_env_var, "BT_AUDIT_ENCRYPTION_KEY", "Must designate encryption key management environment variable");
+        assert_eq!(config.logging.audit.key_rotation_days, 30, "Default key rotation interval must be defined");
+        assert!(config.logging.audit.anchor_checkpoint_url.is_some(), "Audit log must define an external tamper-evident WORM root anchor");
+        assert!(config.logging.audit.key_escrow_path.is_some(), "Audit log must define a secure key escrow archival path for historical log decryption");
     }
 }

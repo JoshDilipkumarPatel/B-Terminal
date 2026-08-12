@@ -92,6 +92,10 @@ impl GlobalKillSwitch {
         *self.activated.read().await
     }
 
+    pub fn get_max_flatten_time(&self) -> Duration {
+        self.max_flatten_time
+    }
+
     pub fn is_active(&self) -> bool {
         self.activated_atomic.load(Ordering::SeqCst)
     }
@@ -306,5 +310,41 @@ impl AutoKillSwitchMonitor {
 impl GlobalKillSwitch {
     pub async fn activate_for_test(&self, reason: KillReason) {
         let _ = self.activate(reason).await;
+    }
+}
+
+pub struct DynamicCircuitBreaker {
+    kill_switch: Arc<GlobalKillSwitch>,
+    rolling_mean: f64,
+    rolling_std_dev: f64,
+}
+
+impl DynamicCircuitBreaker {
+    pub fn new(kill_switch: Arc<GlobalKillSwitch>) -> Self {
+        Self {
+            kill_switch,
+            rolling_mean: 0.0,
+            rolling_std_dev: 0.0,
+        }
+    }
+
+    /// Simulates inspecting a live tick for a 5-sigma anomaly (e.g. Flash Crash or Fat Finger).
+    pub async fn inspect_tick(&mut self, symbol: &str, price: f64) {
+        // Mocking a rolling mean/std-dev update
+        if self.rolling_mean == 0.0 {
+            self.rolling_mean = price;
+            self.rolling_std_dev = price * 0.001; // 0.1% initial std dev
+            return;
+        }
+        
+        let z_score = (price - self.rolling_mean).abs() / self.rolling_std_dev;
+        
+        if z_score > 5.0 {
+            tracing::error!("5-SIGMA FAT FINGER DETECTED on {}! Z-Score: {}. Triggering hard kill switch.", symbol, z_score);
+            let _ = self.kill_switch.activate(KillReason::FatFinger5Sigma).await;
+        } else {
+            // Update rolling stats slowly
+            self.rolling_mean = self.rolling_mean * 0.99 + price * 0.01;
+        }
     }
 }

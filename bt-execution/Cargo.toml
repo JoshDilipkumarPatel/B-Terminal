@@ -3,6 +3,9 @@ name = "bt-execution"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+stub-brokers = []
+
 [dependencies]
 bt-core = { path = "../bt-core" }
 bt-data = { path = "../bt-data" }
@@ -26,3 +29,13 @@ rand = { version = "0.8", features = ["small_rng"] }
 hmac = { workspace = true }
 sha2 = { workspace = true }
 hex = "0.4"
+sqlx = { workspace = true }
+zeroize = { version = "1.8", features = ["derive", "serde"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[[bench]]
+name = "oms_benchmark"
+harness = false

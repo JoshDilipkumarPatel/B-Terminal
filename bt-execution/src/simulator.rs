@@ -52,6 +52,7 @@ struct SimulatorState {
     last_prices: HashMap<Symbol, Decimal>,
     fills: Vec<Fill>,
     rng: rand::rngs::StdRng,
+    current_vpin: f64,
 }
 
 pub struct SimulatorAdapter {
@@ -82,6 +83,7 @@ impl SimulatorAdapter {
             last_prices: HashMap::new(),
             fills: Vec::new(),
             rng: rand::rngs::StdRng::from_entropy(),
+            current_vpin: 0.0,
         };
 
         Self {
@@ -98,8 +100,14 @@ impl SimulatorAdapter {
         self.market_data_tx.clone()
     }
 
-    fn apply_slippage(&self, price: Decimal, side: Side) -> Decimal {
-        let slippage = price * Decimal::from(self.config.slippage_bps) / Decimal::new(10000, 0);
+    pub async fn update_vpin(&self, vpin: f64) {
+        let mut state = self.state.write().await;
+        state.current_vpin = vpin;
+    }
+
+    fn apply_slippage(&self, price: Decimal, side: Side, vpin: f64) -> Decimal {
+        let toxicity_multiplier = Decimal::from_f64_retain(1.0 + (vpin * 2.0)).unwrap_or(Decimal::ONE);
+        let slippage = (price * Decimal::from(self.config.slippage_bps) / Decimal::new(10000, 0)) * toxicity_multiplier;
         let spread = price * Decimal::from(self.config.spread_bps) / Decimal::new(10000, 0);
         match side {
             Side::Buy => price + slippage + spread / Decimal::from(2),
@@ -121,7 +129,8 @@ impl SimulatorAdapter {
             return;
         }
 
-        let fill_price = self.apply_slippage(current_price, order.side);
+        let vpin = state.current_vpin;
+        let fill_price = self.apply_slippage(current_price, order.side, vpin);
         let should_fill = state.rng.gen_bool(self.config.fill_probability);
 
         if !should_fill {
@@ -368,7 +377,7 @@ impl BrokerAdapter for SimulatorAdapter {
     async fn get_order_history(&self, limit: usize) -> anyhow::Result<Vec<Order>> {
         let state = self.state.read().await;
         let mut orders: Vec<Order> = state.orders.values().cloned().collect();
-        orders.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        orders.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         orders.truncate(limit);
         Ok(orders)
     }
@@ -455,7 +464,7 @@ impl SimulatorAdapter {
 
         // Try fill pending orders
         for order_id in state.open_orders.clone() {
-            let should_fill = state.orders.get(&order_id).map_or(false, |o| o.order_type == OrderType::Market && o.is_active());
+            let should_fill = state.orders.get(&order_id).is_some_and(|o| o.order_type == OrderType::Market && o.is_active());
             if should_fill {
                 drop(state);
                 self.try_fill_order(order_id, price).await;

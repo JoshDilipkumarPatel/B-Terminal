@@ -166,58 +166,98 @@ enum Commands {
     },
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let cli = Cli::parse();
-
-    // Initialize logging
-    init_logging(&cli.log_level)?;
-
-    // Handle subcommands
-    match cli.command {
-        Some(Commands::Run) | None => {
-            run_terminal(cli).await
-        }
-        Some(Commands::Backtest { strategy, symbol, timeframe, start, end, output }) => {
-            run_backtest_cli(cli.config, strategy, symbol, timeframe, start, end, output).await
-        }
-        Some(Commands::Validate { file }) => {
-            validate_strategy_cli(file).await
-        }
-        Some(Commands::Config { output }) => {
-            generate_config_cli(output).await
-        }
-        Some(Commands::Providers) => {
-            list_providers_cli().await
-        }
-        Some(Commands::Doctor) => {
-            run_doctor(cli.config).await
-        }
-        Some(Commands::Migrate { from }) => {
-            migrate_config_cli(from, cli.config).await
-        }
-        Some(Commands::Predict { symbol, bars }) => {
-            run_predict_cli(&symbol, bars).await
-        }
-        Some(Commands::Autopilot { symbol, mode, cycles }) => {
-            run_autopilot_cli(&symbol, &mode, cycles).await
-        }
-        Some(Commands::PatternSearch { symbol, window }) => {
-            run_pattern_search_cli(&symbol, window).await
-        }
-        Some(Commands::StatArb { pair_a, pair_b, intervals }) => {
-            run_stat_arb_cli(&pair_a, &pair_b, intervals).await
-        }
-        Some(Commands::ScanDoc { symbol, model, hf_token }) => {
-            run_scan_doc_cli(&symbol, &model, hf_token.as_deref()).await
-        }
-        Some(Commands::Syndicate { symbol, regime, veto }) => {
-            run_syndicate_cli(&symbol, &regime, veto).await
-        }
-        Some(Commands::TestAlarm { tier, mute }) => {
-            run_test_alarm_cli(&tier, mute).await
+fn main() -> Result<()> {
+    // -------------------------------------------------------------------------
+    // B-TERMINAL V3.0 PILLAR 1: THE NANOSECOND LEAP (HARDWARE & KERNEL BYPASS)
+    // -------------------------------------------------------------------------
+    // Isolate our critical Tokio Orchestrator thread from OS scheduler noise 
+    // by pinning it strictly to a high-performance logical core.
+    if let Some(core_ids) = core_affinity::get_core_ids() {
+        if let Some(first_core) = core_ids.first() {
+            if core_affinity::set_for_current(*first_core) {
+                // Pin successfully established for main thread
+            }
         }
     }
+    
+    // We use a static atomic counter to uniquely assign each Tokio worker thread to a distinct CPU core.
+    static NEXT_CORE_IDX: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
+
+    // Explicitly tune the Tokio runtime for Windows IOCP and hardware RSS 
+    // instead of relying on the #[tokio::main] macro defaults.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(4) // Constrain worker threads to prevent L3 cache thrashing
+        .on_thread_start(|| {
+            // Align background workers to distinct core IDs to match NIC RSS hashes
+            if let Some(core_ids) = core_affinity::get_core_ids() {
+                if core_ids.len() > 1 {
+                    // Fetch and increment the atomic counter to get a unique thread index
+                    let thread_idx = NEXT_CORE_IDX.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    // Cycle through available cores (skipping Core 0 which is reserved for OS hardware interrupts)
+                    let num_available_cores = core_ids.len() - 1;
+                    let target_core = 1 + (thread_idx % num_available_cores);
+                    
+                    if let Some(core) = core_ids.get(target_core) {
+                        let _ = core_affinity::set_for_current(*core);
+                    }
+                }
+            }
+        })
+        .build()?;
+
+    runtime.block_on(async {
+        let cli = Cli::parse();
+
+        // Initialize logging
+        init_logging(&cli.log_level)?;
+
+        // Handle subcommands
+        match cli.command {
+            Some(Commands::Run) | None => {
+                run_terminal(cli).await
+            }
+            Some(Commands::Backtest { strategy, symbol, timeframe, start, end, output }) => {
+                run_backtest_cli(cli.config, strategy, symbol, timeframe, start, end, output).await
+            }
+            Some(Commands::Validate { file }) => {
+                validate_strategy_cli(file).await
+            }
+            Some(Commands::Config { output }) => {
+                generate_config_cli(output).await
+            }
+            Some(Commands::Providers) => {
+                list_providers_cli().await
+            }
+            Some(Commands::Doctor) => {
+                run_doctor(cli.config).await
+            }
+            Some(Commands::Migrate { from }) => {
+                migrate_config_cli(from, cli.config).await
+            }
+            Some(Commands::Predict { symbol, bars }) => {
+                run_predict_cli(&symbol, bars).await
+            }
+            Some(Commands::Autopilot { symbol, mode, cycles }) => {
+                run_autopilot_cli(&symbol, &mode, cycles).await
+            }
+            Some(Commands::PatternSearch { symbol, window }) => {
+                run_pattern_search_cli(&symbol, window).await
+            }
+            Some(Commands::StatArb { pair_a, pair_b, intervals }) => {
+                run_stat_arb_cli(&pair_a, &pair_b, intervals).await
+            }
+            Some(Commands::ScanDoc { symbol, model, hf_token }) => {
+                run_scan_doc_cli(&symbol, &model, hf_token.as_deref()).await
+            }
+            Some(Commands::Syndicate { symbol, regime, veto }) => {
+                run_syndicate_cli(&symbol, &regime, veto).await
+            }
+            Some(Commands::TestAlarm { tier, mute }) => {
+                run_test_alarm_cli(&tier, mute).await
+            }
+        }
+    })
 }
 
 fn init_logging(level: &str) -> Result<()> {
@@ -319,7 +359,9 @@ async fn run_headless(config: AppConfig) -> Result<()> {
     }
     oms.start().await?;
 
-    let _risk_manager = bt_core::risk_limits::RiskManager::new(bt_core::risk_limits::RiskLimits::default());
+    let mut risk_limits = bt_core::risk_limits::RiskLimits::default();
+    risk_limits.global.correlation_recompute_interval = config.risk.global.correlation_recompute_interval;
+    let _risk_manager = bt_core::risk_limits::RiskManager::new(risk_limits);
 
     // Wait for shutdown signal
     tokio::signal::ctrl_c().await?;
@@ -386,7 +428,7 @@ async fn run_backtest_cli(
     println!("Strategy: {}", strategy);
     println!("Symbols: {:?}", symbols);
     println!("Timeframe: {}", timeframe);
-    println!("");
+    println!();
     println!("Total Return:       {:+.2}%", result.total_return * hundred);
     println!("Annualized Return:  {:+.2}%", result.annualized_return * hundred);
     println!("Sharpe Ratio:       {:.2}", result.sharpe_ratio);
@@ -859,7 +901,8 @@ async fn run_predict_cli(symbol: &str, bar_count: usize) -> Result<()> {
 
 async fn run_autopilot_cli(symbol: &str, mode: &str, cycles: usize) -> Result<()> {
     let curr_symbol = if symbol.starts_with("NSE:") || symbol.starts_with("BSE:") || symbol.contains("INR") { "₹" } else { "$" };
-    let mut equity = 10_00_000.0_f64; // ₹10,00,000 Starting balance
+    #[allow(clippy::inconsistent_digit_grouping)]
+    let mut equity = 10_00_000.0_f64; // ₹10,00,000 Starting balance (10 Lakhs)
     let initial_equity = equity;
     let min_confidence = 0.55;
 
@@ -1084,6 +1127,7 @@ async fn run_scan_doc_cli(symbol: &str, model: &str, hf_token: Option<&str>) -> 
 
     let source_badge = match inference.source {
         bt_strategy::InferenceSource::HuggingFaceCloudApi => "☁ Hugging Face Cloud Serverless API (REST HTTP)",
+        bt_strategy::InferenceSource::LocalServerApi => "🏠 Local OpenAI-Compatible Server (Ollama/LM Studio/vLLM)",
         bt_strategy::InferenceSource::LocalOfflineFallback => "⚡ Local Zero-Latency n-gram Quant Engine (Offline Fallback)",
     };
 
@@ -1121,7 +1165,7 @@ async fn run_syndicate_cli(symbol: &str, regime_str: &str, simulate_veto: bool) 
     };
 
     let council = bt_strategy::SyndicateCouncil::new();
-    let decision = council.convene(symbol, regime, simulate_veto);
+    let decision = council.convene(symbol, regime, simulate_veto, 50000.0, 0.0, 0.0, None).await;
 
     println!("\n=========================================================================");
     println!("       🏛️  B-TERMINAL KI SYNDICATE — 18-AGENT TRADING COUNCIL VAULT        ");

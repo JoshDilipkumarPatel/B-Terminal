@@ -29,6 +29,12 @@ pub enum ParsedCommand {
 
 pub struct CommandParser;
 
+impl Default for CommandParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CommandParser {
     pub fn new() -> Self {
         Self
@@ -183,8 +189,7 @@ impl CommandParser {
 
         let mut suggestions = Vec::new();
 
-        if partial.starts_with(':') {
-            let cmd_part = &partial[1..];
+        if let Some(cmd_part) = partial.strip_prefix(':') {
             for cmd in commands {
                 if cmd.starts_with(cmd_part) {
                     suggestions.push(format!(":{}", cmd));

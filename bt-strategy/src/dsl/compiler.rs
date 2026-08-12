@@ -134,7 +134,8 @@ impl StrategyCompiler {
         let kind_str = pair.as_str().split('(').next().unwrap().trim();
         let params: Vec<f64> = pair.into_inner().map(|p| p.as_str().parse().unwrap_or(0.0)).collect();
 
-        let kind = match kind_str.to_uppercase().as_str() {
+        let kind_upper = kind_str.to_uppercase();
+        let kind = match kind_upper.as_str() {
             "RSI" => IndicatorKind::RSI,
             "EMA" => IndicatorKind::EMA,
             "SMA" => IndicatorKind::SMA,
@@ -152,7 +153,7 @@ impl StrategyCompiler {
             _ => return Err(CompileError::UnknownIndicator(kind_str.to_string())),
         };
 
-        if let Some(info) = self.builtin_indicators.get(&kind_str.to_uppercase()) {
+        if let Some(info) = self.builtin_indicators.get(&kind_upper) {
             if params.len() < info.min_params || params.len() > info.max_params {
                 return Err(CompileError::Semantic(format!(
                     "Indicator {} expects {} to {} parameters, got {}",
@@ -161,15 +162,13 @@ impl StrategyCompiler {
             }
         }
 
-        // Validate indicator period > 0
-        if ["RSI", "EMA", "SMA", "BOLLINGER", "BB", "MACD", "ATR", "VOLUME_SMA", "STDDEV", "HIGHEST", "LOWEST"].contains(&kind_str.to_uppercase().as_str()) {
-            if let Some(&period) = params.first() {
-                if period <= 0.0 {
-                    return Err(CompileError::Semantic(format!(
-                        "Indicator {} requires period > 0, got {}",
-                        kind_str, period
-                    )));
-                }
+        // Validate all indicator parameters against safe numerical bounds (Items 6, 10, 14)
+        for &param in &params {
+            if param <= 0.0 || param > 5000.0 {
+                return Err(CompileError::Semantic(format!(
+                    "Indicator {} requires all parameters in range 0 < param <= 5000, got {}",
+                    kind_str, param
+                )));
             }
         }
 
@@ -555,5 +554,44 @@ mod tests {
         let compiler = StrategyCompiler::new();
         let result = compiler.compile(source);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_out_of_bounds_indicator_period() {
+        let source = r#"
+            strategy "Test" {}
+            indicators {
+                huge_rsi: RSI(100000)
+            }
+        "#;
+
+        let compiler = StrategyCompiler::new();
+        let result = compiler.compile(source);
+        assert!(result.is_err(), "Must reject indicator periods exceeding safe upper bounds (5000)");
+        if let Err(CompileError::Semantic(msg)) = result {
+            assert!(msg.contains("0 < param <= 5000") || msg.contains("0 < period <= 5000"), "Error message must indicate bounds violation: {}", msg);
+        } else {
+            panic!("Expected semantic error for out of bounds period");
+        }
+    }
+
+    #[test]
+    fn test_compile_multi_param_indicator_bounds() {
+        let source = r#"
+            strategy "Test" {}
+            indicators {
+                bad_bb: BB(20, 10000)
+            }
+        "#;
+        let compiler = StrategyCompiler::new();
+        assert!(compiler.compile(source).is_err(), "Must reject out-of-bounds second parameters like BB std dev > 5000");
+
+        let source_macd = r#"
+            strategy "Test" {}
+            indicators {
+                bad_macd: MACD(12, 26, 0)
+            }
+        "#;
+        assert!(compiler.compile(source_macd).is_err(), "Must reject zero parameters like MACD signal period = 0");
     }
 }

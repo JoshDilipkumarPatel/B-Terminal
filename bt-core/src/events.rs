@@ -86,6 +86,7 @@ impl Timeframe {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "tick" | "t" => Some(Timeframe::Tick),
@@ -278,6 +279,7 @@ pub enum KillReason {
     SystemError,
     ConnectionLost,
     RiskLimitBreach,
+    FatFinger5Sigma,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

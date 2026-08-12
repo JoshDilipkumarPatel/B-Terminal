@@ -2,11 +2,18 @@
 
 pub mod alarms;
 pub mod config;
+pub mod correlation_groups;
 pub mod error;
 pub mod events;
 pub mod kill_switch;
+pub mod regime;
 pub mod risk_limits;
 pub mod types;
+pub mod audit_anchor;
+pub mod chaos;
+pub mod secrets;
+pub mod gpu_risk;
+pub mod state;
 
 pub use config::Config;
 pub use error::{BtError, Result};

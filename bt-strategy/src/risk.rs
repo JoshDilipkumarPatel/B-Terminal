@@ -1,5 +1,7 @@
 use bt_core::risk_limits::{RiskManager, StrategyRiskLimits, SymbolRiskLimits, RiskCheckResult};
 use bt_core::types::{Order, OrderType};
+
+pub mod auto_hedger;
 use bt_core::events::{SignalEntry, KillReason};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;

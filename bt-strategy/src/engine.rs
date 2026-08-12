@@ -28,12 +28,14 @@ pub struct Signal {
     pub timestamp: DateTime<Utc>,
 }
 
+type SignalCache = Arc<RwLock<HashMap<String, (DateTime<Utc>, SignalEntry)>>>;
+
 pub struct SignalEngine {
     strategies: Arc<RwLock<HashMap<String, StrategyState>>>,
     compiler: StrategyCompiler,
     event_tx: broadcast::Sender<SignalEvent>,
     config: EngineConfig,
-    dedup_cache: Arc<RwLock<HashMap<String, (DateTime<Utc>, SignalEntry)>>>,
+    dedup_cache: SignalCache,
 }
 
 #[derive(Debug)]
@@ -437,6 +439,7 @@ impl SignalEngine {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn eval_numeric(&self, expr: &Expression, values: &HashMap<String, IndicatorOutput>, previous_values: &HashMap<String, IndicatorOutput>) -> Option<Decimal> {
         match expr {
             Expression::Literal(v) => Some(Decimal::from_f64_retain(*v).unwrap_or(Decimal::ZERO)),

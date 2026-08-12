@@ -194,7 +194,7 @@ impl LayoutManager {
                     }
                 }
                 ResizeDirection::Right => {
-                    if idx % 2 == 0 { // Left column
+                    if idx.is_multiple_of(2) { // Left column
                         self.ratios[idx] -= step;
                         self.ratios[idx + 1] += step;
                     }

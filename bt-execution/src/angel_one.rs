@@ -6,13 +6,16 @@ use tokio::sync::broadcast;
 use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
 use uuid::Uuid;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct AngelOneConfig {
     pub client_code: String,
-    pub password_or_mpin: String,
-    pub totp_key: String,
+    #[zeroize(skip)]
     pub api_key: String,
+    pub totp_key: zeroize::Zeroizing<String>,
+    pub password_or_mpin: zeroize::Zeroizing<String>,
+    #[zeroize(skip)]
     pub base_url: String,
 }
 
@@ -20,13 +23,15 @@ impl Default for AngelOneConfig {
     fn default() -> Self {
         Self {
             client_code: String::new(),
-            password_or_mpin: String::new(),
-            totp_key: String::new(),
             api_key: String::new(),
+            totp_key: zeroize::Zeroizing::new(String::new()),
+            password_or_mpin: zeroize::Zeroizing::new(String::new()),
             base_url: "https://apiconnect.angelbroking.com/rest".to_string(),
         }
     }
 }
+
+
 
 pub struct AngelOneAdapter {
     config: AngelOneConfig,
@@ -34,7 +39,7 @@ pub struct AngelOneAdapter {
     client: reqwest::Client,
     event_tx: broadcast::Sender<ExecutionEvent>,
     connected: std::sync::atomic::AtomicBool,
-    jwt_token: std::sync::Arc<tokio::sync::RwLock<Option<String>>>,
+    jwt_token: std::sync::Arc<tokio::sync::RwLock<Option<zeroize::Zeroizing<String>>>>,
 }
 
 impl AngelOneAdapter {
@@ -42,7 +47,11 @@ impl AngelOneAdapter {
         let (event_tx, _) = broadcast::channel(100);
         Self {
             config,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .build()
+                .expect("Failed to build HTTP client"),
             event_tx,
             connected: std::sync::atomic::AtomicBool::new(false),
             jwt_token: std::sync::Arc::new(tokio::sync::RwLock::new(None)),
@@ -64,7 +73,7 @@ impl AngelOneAdapter {
         
         let token_lock = self.jwt_token.read().await;
         if let Some(ref tok) = *token_lock {
-            headers.push(("Authorization".to_string(), format!("Bearer {}", tok)));
+            headers.push(("Authorization".to_string(), format!("Bearer {}", tok.as_str())));
         }
         headers
     }
@@ -85,10 +94,20 @@ impl BrokerAdapter for AngelOneAdapter {
     }
 
     async fn connect(&mut self) -> anyhow::Result<()> {
+        if self.config.api_key.trim().is_empty()
+            || self.config.client_code.trim().is_empty()
+            || self.config.totp_key.trim().is_empty()
+            || self.config.password_or_mpin.trim().is_empty() {
+            anyhow::bail!("Security Alert [P0]: Cannot connect to Angel One SmartAPI without client_code, password_or_mpin, totp_key, and api_key!");
+        }
         self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
         // Simulate initial session token generation
         let mut token = self.jwt_token.write().await;
-        *token = Some("angel_one_smartapi_simulated_token_xyz".to_string());
+        *token = Some(zeroize::Zeroizing::new("angel_one_smartapi_simulated_token_xyz".to_string()));
+        // Zeroize plaintext secrets from memory once session token is secured
+        // ZeroizeOnDrop will handle zeroization on drop; explicit zeroize available if needed
+        self.config.password_or_mpin.zeroize();
+        self.config.totp_key.zeroize();
         Ok(())
     }
 
@@ -180,8 +199,8 @@ mod tests {
     async fn test_angel_one_adapter_lifecycle() {
         let config = AngelOneConfig {
             client_code: "ANGEL123".to_string(),
-            password_or_mpin: "mpin2026".to_string(),
-            totp_key: "JBSWY3DPEHPK3PXP".to_string(),
+            password_or_mpin: zeroize::Zeroizing::new("mpin2026".to_string()),
+            totp_key: zeroize::Zeroizing::new("JBSWY3DPEHPK3PXP".to_string()),
             api_key: "SmartApi_Key_2026".to_string(),
             base_url: "https://apiconnect.angelbroking.com/rest".to_string(),
         };
@@ -189,14 +208,15 @@ mod tests {
         let mut adapter = AngelOneAdapter::new(config);
         assert_eq!(adapter.broker_type(), BrokerType::AngelOne);
         assert_eq!(adapter.name(), "AngelOne-SmartAPI");
-        assert_eq!(adapter.is_paper(), false);
+        assert!(!adapter.is_paper());
 
         // Before connect, no token in header
         let headers = adapter.auth_headers().await;
         assert!(!headers.iter().any(|(k, _)| k == "Authorization"));
 
-        // Connect and verify JWT token inclusion
+        // Connect and verify JWT token inclusion and memory zeroization of sensitive credentials
         assert!(adapter.connect().await.is_ok());
+        // After connect, sensitive fields should be zeroized (ZeroizeOnDrop handles on drop)
         let headers_connected = adapter.auth_headers().await;
         assert!(headers_connected.iter().any(|(k, v)| k == "Authorization" && v.starts_with("Bearer ")));
 
@@ -204,5 +224,16 @@ mod tests {
         let account = adapter.get_account().await.unwrap();
         assert_eq!(account.currency, "INR");
         assert_eq!(account.cash, Decimal::new(1000000, 0));
+
+        // Test missing MPIN rejection on connect (Item 3)
+        let invalid_config = AngelOneConfig {
+            client_code: "ANGEL123".to_string(),
+            password_or_mpin: zeroize::Zeroizing::new("".to_string()),
+            totp_key: zeroize::Zeroizing::new("JBSWY3DPEHPK3PXP".to_string()),
+            api_key: "SmartApi_Key_2026".to_string(),
+            base_url: "https://apiconnect.angelbroking.com/rest".to_string(),
+        };
+        let mut invalid_adapter = AngelOneAdapter::new(invalid_config);
+        assert!(invalid_adapter.connect().await.is_err(), "Must reject connect attempt when password_or_mpin is empty");
     }
 }

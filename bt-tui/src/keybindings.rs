@@ -66,7 +66,7 @@ impl KeybindingManager {
         }
 
         // Load mode-specific bindings
-        for (_mode, bindings) in &config.mode_specific {
+        for bindings in config.mode_specific.values() {
             for (key_str, action_str) in bindings {
                 if let (Some(key), Some(action)) = (parse_key(key_str), parse_action(action_str)) {
                     self.bind(key, action);

@@ -42,6 +42,7 @@ impl TurboQuantIndex {
     }
 
     /// Generates a deterministic pseudo-orthogonal transformation matrix for data-oblivious projection
+    #[allow(clippy::needless_range_loop)]
     fn generate_pseudo_orthogonal_matrix(dim: usize, seed: u64) -> Vec<Vec<f64>> {
         let mut matrix = vec![vec![0.0; dim]; dim];
         // Simple Hadamard / Trigo rotation generation for deterministic data-oblivious uniform spread
@@ -57,6 +58,7 @@ impl TurboQuantIndex {
     }
 
     /// Applies rotation and scalar quantization to compress f64 float vectors to tiny i8 quantized vectors
+    #[allow(clippy::needless_range_loop)]
     pub fn quantize(&self, features: &[f64]) -> Vec<i8> {
         let mut rotated = vec![0.0; self.dimensions];
         let len = features.len().min(self.dimensions);

@@ -31,6 +31,7 @@ pub enum BrokerType {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct BrokerCredentials {
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
@@ -48,6 +49,32 @@ impl std::fmt::Debug for BrokerCredentials {
             .finish()
     }
 }
+
+impl BrokerCredentials {
+    /// Validates presence of required authentication secrets and rejects empty string values (Finding #2 & Item 7)
+    pub fn validate_required(&self, require_key: bool, require_secret: bool, require_passphrase: bool) -> anyhow::Result<()> {
+        let check_field = |val: &Option<String>, required: bool, name: &str| -> anyhow::Result<()> {
+            match val {
+                None if required => anyhow::bail!("Security Alert [P0]: Missing required {} in BrokerCredentials", name),
+                Some(s) if s.trim().is_empty() => anyhow::bail!("Security Alert [P0]: Explicitly provided {} in BrokerCredentials cannot be empty string", name),
+                _ => Ok(()),
+            }
+        };
+        check_field(&self.api_key, require_key, "api_key")?;
+        check_field(&self.api_secret, require_secret, "api_secret")?;
+        check_field(&self.passphrase, require_passphrase, "passphrase")?;
+        Ok(())
+    }
+}
+
+/// Enforces safety lockouts on stub broker implementations to prevent production state mismatch (Finding #1)
+pub fn enforce_stub_broker_safety(broker_name: &str) -> anyhow::Result<()> {
+    if !cfg!(feature = "stub-brokers") {
+        anyhow::bail!("SECURITY ALERT [P0]: Stub broker adapter ('{}') is prohibited from live trading execution! Enable paper trading mode or compile with `--features stub-brokers`.", broker_name);
+    }
+    Ok(())
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrokerEndpoints {
@@ -68,16 +95,6 @@ impl Default for BrokerConfig {
     }
 }
 
-impl Default for BrokerCredentials {
-    fn default() -> Self {
-        Self {
-            api_key: None,
-            api_secret: None,
-            passphrase: None,
-            account_id: None,
-        }
-    }
-}
 
 impl Default for BrokerEndpoints {
     fn default() -> Self {
@@ -154,4 +171,38 @@ pub struct BrokerHealth {
     pub last_order_ms: Option<u64>,
     pub error_rate: f64,
     pub connection_status: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_broker_credentials_validation() {
+        let empty_cred = BrokerCredentials {
+            api_key: None,
+            api_secret: Some("secret".to_string()),
+            passphrase: None,
+            account_id: None,
+        };
+        assert!(empty_cred.validate_required(true, false, false).is_err(), "Must fail validation when required API key is missing");
+        assert!(empty_cred.validate_required(false, true, false).is_ok(), "Must pass when only checking provided secret");
+
+        let empty_str_cred = BrokerCredentials {
+            api_key: Some("".to_string()),
+            api_secret: Some("secret".to_string()),
+            passphrase: None,
+            account_id: None,
+        };
+        assert!(empty_str_cred.validate_required(false, true, false).is_err(), "Must reject explicitly provided empty string even if require_key=false");
+    }
+
+    #[test]
+    fn test_stub_broker_safety_lockout() {
+        if !cfg!(feature = "stub-brokers") {
+            let res = enforce_stub_broker_safety("Zerodha");
+            assert!(res.is_err(), "Must throw security error when engaging stub adapter without explicit feature flag");
+            assert!(res.unwrap_err().to_string().contains("SECURITY ALERT [P0]"));
+        }
+    }
 }

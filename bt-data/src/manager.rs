@@ -15,6 +15,12 @@ pub struct DataFeedManager {
     fallback_order: Arc<RwLock<Vec<String>>>,
 }
 
+impl Default for DataFeedManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataFeedManager {
     pub fn new() -> Self {
         Self {

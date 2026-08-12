@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc, Duration};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use tokio::sync::broadcast;
 use tokio::time::Duration as TokioDuration;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
@@ -16,12 +17,23 @@ use futures::{SinkExt, StreamExt};
 const POLYGON_WS_URL: &str = "wss://socket.polygon.io/stocks";
 const POLYGON_REST_URL: &str = "https://api.polygon.io";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PolygonConfig {
     pub api_key: String,
     pub ws_url: String,
     pub rest_url: String,
     pub feed: String, // "sip" or "iex"
+}
+
+impl fmt::Debug for PolygonConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PolygonConfig")
+            .field("api_key", &"[REDACTED]")
+            .field("ws_url", &self.ws_url)
+            .field("rest_url", &self.rest_url)
+            .field("feed", &self.feed)
+            .finish()
+    }
 }
 
 impl Default for PolygonConfig {
@@ -129,6 +141,7 @@ impl PolygonProvider {
     }
 
     async fn start_websocket(&mut self) -> Result<()> {
+        tracing::debug!("Connecting to Polygon WebSocket (API key redacted)");
         let url = format!("{}?apikey={}", self.config.ws_url, self.config.api_key);
         let (ws_stream, _) = connect_async(&url).await
             .context("Failed to connect to Polygon WebSocket")?;
